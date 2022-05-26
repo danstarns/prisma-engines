@@ -7,6 +7,7 @@ use query_core::MetricRegistry;
 use query_core::{schema::QuerySchemaRenderer, TxId};
 use request_handlers::{dmmf, GraphQLSchemaRenderer, GraphQlHandler, TxInput};
 use serde_json::json;
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;
@@ -240,26 +241,49 @@ fn playground_handler() -> Response<Body> {
         .unwrap()
 }
 
+#[derive(PartialEq)]
+enum MetricFormat {
+    JSON,
+    PROMETHEUS,
+}
+
 async fn handle_metrics(state: State, req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
-    if let Some(query) = req.uri().query() {
+    let format = if let Some(query) = req.uri().query() {
         if query.contains("format=json") {
-            let metrics = state.cx.metrics.to_json(Default::default());
-
-            let res = Response::builder()
-                .status(StatusCode::OK)
-                .header(CONTENT_TYPE, "application/json")
-                .body(Body::from(metrics.to_string()))
-                .unwrap();
-
-            return Ok(res);
+            MetricFormat::JSON
+        } else {
+            MetricFormat::PROMETHEUS
         }
+    } else {
+        MetricFormat::PROMETHEUS
+    };
+
+    let body_start = req.into_body();
+    // block and buffer request until the request has completed
+    let full_body = hyper::body::to_bytes(body_start).await?;
+
+    let global_labels: HashMap<String, String> = match serde_json::from_slice(full_body.as_ref()) {
+        Ok(map) => map,
+        Err(_e) => HashMap::new(),
+    };
+
+    if format == MetricFormat::JSON {
+        let metrics = state.cx.metrics.to_json(global_labels);
+
+        let res = Response::builder()
+            .status(StatusCode::OK)
+            .header(CONTENT_TYPE, "application/json")
+            .body(Body::from(metrics.to_string()))
+            .unwrap();
+
+        return Ok(res);
     }
 
-    let metrics = state.cx.metrics.to_prometheus(Default::default());
+    let metrics = state.cx.metrics.to_prometheus(global_labels);
 
     let res = Response::builder()
         .status(StatusCode::OK)
-        .header(CONTENT_TYPE, "application/json")
+        .header(CONTENT_TYPE, "application/text")
         .body(Body::from(metrics))
         .unwrap();
 
