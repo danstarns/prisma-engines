@@ -44,7 +44,7 @@ const ACCEPT_LIST: &[&str] = &[
     "pool_idle_connections",
     "pool_wait_count",
     "pool_wait_duration_ms",
-    "query_total_elapsed_time+ms",
+    "query_total_elapsed_time_ms",
     "query_total_queries",
     "query_active_transactions",
     "query_total_operations",
