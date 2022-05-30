@@ -3,8 +3,8 @@ use datamodel::common::preview_features::PreviewFeature;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{header::CONTENT_TYPE, Body, HeaderMap, Method, Request, Response, Server, StatusCode};
 use opentelemetry::{global, propagation::Extractor, Context};
-use query_core::MetricRegistry;
 use query_core::{schema::QuerySchemaRenderer, TxId};
+use query_core::{MetricFormat, MetricRegistry};
 use request_handlers::{dmmf, GraphQLSchemaRenderer, GraphQlHandler, TxInput};
 use serde_json::json;
 use std::collections::HashMap;
@@ -241,21 +241,15 @@ fn playground_handler() -> Response<Body> {
         .unwrap()
 }
 
-#[derive(PartialEq)]
-enum MetricFormat {
-    JSON,
-    PROMETHEUS,
-}
-
 async fn handle_metrics(state: State, req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
     let format = if let Some(query) = req.uri().query() {
         if query.contains("format=json") {
-            MetricFormat::JSON
+            MetricFormat::Json
         } else {
-            MetricFormat::PROMETHEUS
+            MetricFormat::Prometheus
         }
     } else {
-        MetricFormat::PROMETHEUS
+        MetricFormat::Prometheus
     };
 
     let body_start = req.into_body();
@@ -267,7 +261,7 @@ async fn handle_metrics(state: State, req: Request<Body>) -> Result<Response<Bod
         Err(_e) => HashMap::new(),
     };
 
-    if format == MetricFormat::JSON {
+    if format == MetricFormat::Json {
         let metrics = state.cx.metrics.to_json(global_labels);
 
         let res = Response::builder()

@@ -33,6 +33,7 @@ mod registry;
 use metrics::{absolute_counter, describe_counter, describe_gauge, describe_histogram, gauge};
 use recorder::*;
 pub use registry::MetricRegistry;
+use serde::Deserialize;
 
 // At the moment the histogram is only used for timings. So the bounds are hard coded here
 // The buckets are for ms
@@ -50,6 +51,14 @@ const ACCEPT_LIST: &[&str] = &[
     "query_total_operations",
     "query_operation_total_elapsed_time_ms",
 ];
+
+#[derive(PartialEq, Debug, Deserialize)]
+pub enum MetricFormat {
+    #[serde(alias = "json")]
+    Json,
+    #[serde(alias = "prometheus")]
+    Prometheus,
+}
 
 pub fn setup() {
     set_recorder();
